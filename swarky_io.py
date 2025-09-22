@@ -256,3 +256,40 @@ class DefaultIOOps:
         if edi.exists():
             return
         self.write_lines(edi, body_lines)
+
+
+_DEFAULT_IO = DefaultIOOps()
+
+
+def iter_candidates(dirp: Path, accept_pdf: bool):
+    """Itera i file candidati usando l'implementazione predefinita."""
+    yield from _DEFAULT_IO.iter_candidates(dirp, accept_pdf)
+
+
+def list_same_doc_prefisso(dirp: Path, docno_prefix: str) -> tuple[str, ...]:
+    """Restituisce i nomi che iniziano con il prefisso indicato."""
+    return _DEFAULT_IO.list_same_doc_prefisso(dirp, docno_prefix)
+
+
+def check_orientation_ok(tif_path: Path) -> bool:
+    return _DEFAULT_IO.check_orientation_ok(tif_path)
+
+
+def fast_copy_or_link(src: Path, dst: Path) -> None:
+    _DEFAULT_IO.fast_copy_or_link(src, dst)
+
+
+def move_to(src: Path, dst_dir: Path) -> None:
+    _DEFAULT_IO.move_to(src, dst_dir)
+
+
+def move_to_storico_safe(src: Path, dst_dir: Path) -> tuple[bool, int]:
+    return _DEFAULT_IO.move_to_storico_safe(src, dst_dir)
+
+
+def write_lines(p: Path, lines: List[str]) -> None:
+    _DEFAULT_IO.write_lines(p, lines)
+
+
+def write_edi(*, file_name: str, out_dir: Path, body_lines: List[str]) -> None:
+    _DEFAULT_IO.write_edi(file_name=file_name, out_dir=out_dir, body_lines=body_lines)

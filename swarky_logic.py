@@ -3,7 +3,7 @@ from __future__ import annotations
 import re, logging, time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple, Iterable, Dict
+from typing import Iterable, List, Optional, Tuple
 from datetime import datetime
 
 from swarky_io import IOOps
@@ -56,6 +56,10 @@ def _parse_prefixed(names: tuple[str, ...]) -> list[tuple[str, str, str, str]]:
         if mm:
             out.append((mm.group(4), nm, mm.group(6).upper(), mm.group(5)))
     return out
+
+def parse_prefixed(names: Iterable[str]) -> list[tuple[str, str, str, str]]:
+    """Estrae revisione, nome, metrica e foglio dai nomi compatibili."""
+    return _parse_prefixed(tuple(names))
 
 def size_from_letter(ch: str) -> str:
     return dict(A="A4",B="A3",C="A2",D="A1",E="A0").get(ch.upper(),"A4")
@@ -118,10 +122,12 @@ def list_same_doc_prefisso(io: IOOps, dirp: Path, m: re.Match) -> list[tuple[str
     names = tuple(nm for nm in names_all if nm.lower().endswith((".tif",".pdf")))
     return _parse_prefixed(names)
 
-def write_edi_body_for_standard(*, m: re.Match, loc: dict, file_name: str) -> List[str]:
+def build_edi_standard(*, m: re.Match, loc: dict, file_name: str,
+                       file_type: str) -> List[str]:
+    """Costruisce le righe per il file .DESEDI standard/FIV."""
     document_no = f"D{m.group(1)}{m.group(2)}{m.group(3)}"
-    rev = m.group(4); sheet = m.group(5)
-    file_type = "Pdf" if Path(file_name).suffix.lower() == ".pdf" else "Tiff"
+    rev = m.group(4)
+    sheet = m.group(5)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return [
         "[Database]",
@@ -158,5 +164,49 @@ def write_edi_body_for_standard(*, m: re.Match, loc: dict, file_name: str) -> Li
         f"DocumentRev={rev}",
         f"FileName={file_name}",
         f"FileType={file_type}",
+        f"Currentdate={now}",
+    ]
+
+
+def build_edi_iss(*, match: re.Match, file_name: str) -> List[str]:
+    """Costruisce le righe per il file .DESEDI specifico ISS."""
+    document_no = f"G{match.group(1)}{match.group(2)}{match.group(3)}ISS"
+    rev = match.group(4)
+    sheet = match.group(5)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return [
+        "[Database]",
+        "ServerName=ORMDB33",
+        "ProjectName=FPD Engineering",
+        "[DatabaseFields]",
+        f"DocumentNo={document_no}",
+        f"DocumentRev={rev}",
+        f"SheetNumber={sheet}",
+        "Description=",
+        "PumpModel=(UNKNOWN)",
+        "OEM=Flowserve",
+        "PumpSize=",
+        "OrderNumber=",
+        "SerialNumber=",
+        "Document_Type=Customer Drawings",
+        "DrawingClass=COMMERCIAL",
+        "DesignCenter=Desio, Italy",
+        "OEMSite=Desio, Italy",
+        "OEMDrawingNumber=",
+        "UOM=Metric",
+        "DWGLanguage=English",
+        "CurrentRevision=Y",
+        "EnteredBy=10150286",
+        "Notes=",
+        "NonEnglishDesc=",
+        "SupersededBy=",
+        "NumberOfStages=",
+        "[DrawingInfo]",
+        f"DocumentNo={document_no}",
+        f"SheetNumber={sheet}",
+        "Document_Type=Customer Drawings",
+        f"DocumentRev={rev}",
+        f"FileName={file_name}",
+        "FileType=Pdf",
         f"Currentdate={now}",
     ]
