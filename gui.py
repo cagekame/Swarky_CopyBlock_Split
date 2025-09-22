@@ -20,8 +20,7 @@ from swarky_logic import (
     log_swarky,
     map_location,
     parse_prefixed,          # parse dei nomi (no I/O)
-    build_edi_standard,      # costruzione corpo EDI standard/FIV
-    build_edi_iss,           # costruzione corpo EDI ISS
+    build_edi_document,      # costruzione corpo EDI (standard/ISS)
 )
 
 # ====== I/O (solo operazioni su FS) =========================================
@@ -325,7 +324,7 @@ def _process_candidate(p: Path, cfg: Config) -> bool:
         with ui_phase(f"{name} • write_EDI"):
             try:
                 file_type = "Pdf" if new_path.suffix.lower() == ".pdf" else "Tiff"
-                body = build_edi_standard(m=m, loc=loc, file_name=name, file_type=file_type)
+                body = build_edi_document(match=m, loc=loc, file_name=name, file_type=file_type)
                 write_edi(file_name=name, out_dir=cfg.PLM_DIR, body_lines=body)
             except Exception as e:
                 logging.exception("Impossibile creare DESEDI per %s: %s", name, e)
@@ -355,7 +354,7 @@ def iss_loading(cfg: Config) -> bool:
             continue
         try:
             move_to(p, cfg.PLM_DIR)
-            body = build_edi_iss(match=m, file_name=p.name)
+            body = build_edi_document(match=m, file_name=p.name, scheme="iss")
             write_edi(file_name=p.name, out_dir=cfg.PLM_DIR, body_lines=body)
             _append_filelog_line(_txt_processed(p.name, "ISS", "ISS"))
             log_swarky(p.name, "ISS", "ISS", "", "")
@@ -390,8 +389,12 @@ def fiv_loading(cfg: Config) -> bool:
             continue
         loc = map_location(m, cfg)
         try:
-            body = build_edi_standard(m=m, loc=loc, file_name=p.name,
-                                      file_type=("Pdf" if ext == ".pdf" else "Tiff"))
+            body = build_edi_document(
+                match=m,
+                loc=loc,
+                file_name=p.name,
+                file_type=("Pdf" if ext == ".pdf" else "Tiff"),
+            )
             write_edi(file_name=p.name, out_dir=cfg.PLM_DIR, body_lines=body)
             move_to(p, cfg.PLM_DIR)
             _append_filelog_line(_txt_processed(p.name, "FIV", "FIV loading"))

@@ -138,87 +138,76 @@ def build_edi(*,
     return lines
 
 
-def build_edi_standard(*, m: re.Match, loc: dict, file_name: str,
-                       file_type: str) -> List[str]:
-    """Costruisce le righe per il file .DESEDI standard/FIV."""
-    document_no = f"D{m.group(1)}{m.group(2)}{m.group(3)}"
-    rev = m.group(4)
-    sheet = m.group(5)
+def build_edi_document(*,
+                      match: re.Match,
+                      file_name: str,
+                      scheme: str = "standard",
+                      file_type: str = "Pdf",
+                      loc: Optional[dict] = None) -> List[str]:
+    """Costruisce le righe per il file .DESEDI in base allo schema richiesto."""
+    scheme_lower = scheme.lower()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if scheme_lower == "standard":
+        if loc is None:
+            raise ValueError("'loc' è obbligatorio per lo schema standard")
+        document_no = f"D{match.group(1)}{match.group(2)}{match.group(3)}"
+        rev = match.group(4)
+        sheet = match.group(5)
+        actual_size: Optional[str] = size_from_letter(match.group(1))
+        uom = uom_from_letter(match.group(6))
+        lang = loc["lang"]
+        document_type = loc["doctype"]
+        drawing_document_type = "Detail" if document_type == "DETAIL" else "Customer Drawings"
+    elif scheme_lower == "iss":
+        document_no = f"G{match.group(1)}{match.group(2)}{match.group(3)}ISS"
+        rev = match.group(4)
+        sheet = match.group(5)
+        actual_size = None
+        uom = "Metric"
+        lang = "English"
+        document_type = "Customer Drawings"
+        drawing_document_type = "Customer Drawings"
+        file_type = "Pdf"
+    else:
+        raise ValueError(f"Schema EDI sconosciuto: {scheme}")
+
     database_fields: list[Tuple[str, str]] = [
         ("DocumentNo", document_no),
         ("DocumentRev", rev),
         ("SheetNumber", sheet),
         ("Description", ""),
-        ("ActualSize", size_from_letter(m.group(1))),
+    ]
+    if actual_size is not None:
+        database_fields.append(("ActualSize", actual_size))
+    database_fields.extend([
         ("PumpModel", "(UNKNOWN)"),
         ("OEM", "Flowserve"),
         ("PumpSize", ""),
         ("OrderNumber", ""),
         ("SerialNumber", ""),
-        ("Document_Type", loc['doctype']),
+        ("Document_Type", document_type),
         ("DrawingClass", "COMMERCIAL"),
         ("DesignCenter", "Desio, Italy"),
         ("OEMSite", "Desio, Italy"),
         ("OEMDrawingNumber", ""),
-        ("UOM", uom_from_letter(m.group(6))),
-        ("DWGLanguage", loc['lang']),
+        ("UOM", uom),
+        ("DWGLanguage", lang),
         ("CurrentRevision", "Y"),
         ("EnteredBy", "10150286"),
         ("Notes", ""),
         ("NonEnglishDesc", ""),
         ("SupersededBy", ""),
         ("NumberOfStages", ""),
-    ]
+    ])
+
     drawing_info: list[Tuple[str, str]] = [
         ("DocumentNo", document_no),
         ("SheetNumber", sheet),
-        ("Document_Type", "Detail" if loc["doctype"] == "DETAIL" else "Customer Drawings"),
+        ("Document_Type", drawing_document_type),
         ("DocumentRev", rev),
         ("FileName", file_name),
         ("FileType", file_type),
-        ("Currentdate", now),
-    ]
-    return build_edi(database_fields=database_fields, drawing_info=drawing_info)
-
-
-def build_edi_iss(*, match: re.Match, file_name: str) -> List[str]:
-    """Costruisce le righe per il file .DESEDI specifico ISS."""
-    document_no = f"G{match.group(1)}{match.group(2)}{match.group(3)}ISS"
-    rev = match.group(4)
-    sheet = match.group(5)
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    database_fields: list[Tuple[str, str]] = [
-        ("DocumentNo", document_no),
-        ("DocumentRev", rev),
-        ("SheetNumber", sheet),
-        ("Description", ""),
-        ("PumpModel", "(UNKNOWN)"),
-        ("OEM", "Flowserve"),
-        ("PumpSize", ""),
-        ("OrderNumber", ""),
-        ("SerialNumber", ""),
-        ("Document_Type", "Customer Drawings"),
-        ("DrawingClass", "COMMERCIAL"),
-        ("DesignCenter", "Desio, Italy"),
-        ("OEMSite", "Desio, Italy"),
-        ("OEMDrawingNumber", ""),
-        ("UOM", "Metric"),
-        ("DWGLanguage", "English"),
-        ("CurrentRevision", "Y"),
-        ("EnteredBy", "10150286"),
-        ("Notes", ""),
-        ("NonEnglishDesc", ""),
-        ("SupersededBy", ""),
-        ("NumberOfStages", ""),
-    ]
-    drawing_info: list[Tuple[str, str]] = [
-        ("DocumentNo", document_no),
-        ("SheetNumber", sheet),
-        ("Document_Type", "Customer Drawings"),
-        ("DocumentRev", rev),
-        ("FileName", file_name),
-        ("FileType", "Pdf"),
         ("Currentdate", now),
     ]
     return build_edi(database_fields=database_fields, drawing_info=drawing_info)
