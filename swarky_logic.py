@@ -122,6 +122,22 @@ def list_same_doc_prefisso(io: IOOps, dirp: Path, m: re.Match) -> list[tuple[str
     names = tuple(nm for nm in names_all if nm.lower().endswith((".tif",".pdf")))
     return _parse_prefixed(names)
 
+def build_edi(*,
+              database_fields: Iterable[Tuple[str, str]],
+              drawing_info: Iterable[Tuple[str, str]]) -> List[str]:
+    """Costruisce la struttura comune delle righe .DESEDI."""
+    lines: list[str] = [
+        "[Database]",
+        "ServerName=ORMDB33",
+        "ProjectName=FPD Engineering",
+        "[DatabaseFields]",
+    ]
+    lines.extend(f"{key}={value}" for key, value in database_fields)
+    lines.append("[DrawingInfo]")
+    lines.extend(f"{key}={value}" for key, value in drawing_info)
+    return lines
+
+
 def build_edi_standard(*, m: re.Match, loc: dict, file_name: str,
                        file_type: str) -> List[str]:
     """Costruisce le righe per il file .DESEDI standard/FIV."""
@@ -129,43 +145,41 @@ def build_edi_standard(*, m: re.Match, loc: dict, file_name: str,
     rev = m.group(4)
     sheet = m.group(5)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return [
-        "[Database]",
-        "ServerName=ORMDB33",
-        "ProjectName=FPD Engineering",
-        "[DatabaseFields]",
-        f"DocumentNo={document_no}",
-        f"DocumentRev={rev}",
-        f"SheetNumber={sheet}",
-        "Description=",
-        f"ActualSize={size_from_letter(m.group(1))}",
-        "PumpModel=(UNKNOWN)",
-        "OEM=Flowserve",
-        "PumpSize=",
-        "OrderNumber=",
-        "SerialNumber=",
-        f"Document_Type={loc['doctype']}",
-        "DrawingClass=COMMERCIAL",
-        "DesignCenter=Desio, Italy",
-        "OEMSite=Desio, Italy",
-        "OEMDrawingNumber=",
-        f"UOM={uom_from_letter(m.group(6))}",
-        f"DWGLanguage={loc['lang']}",
-        "CurrentRevision=Y",
-        "EnteredBy=10150286",
-        "Notes=",
-        "NonEnglishDesc=",
-        "SupersededBy=",
-        "NumberOfStages=",
-        "[DrawingInfo]",
-        f"DocumentNo={document_no}",
-        f"SheetNumber={sheet}",
-        ("Document_Type=Detail" if loc["doctype"]=="DETAIL" else "Document_Type=Customer Drawings"),
-        f"DocumentRev={rev}",
-        f"FileName={file_name}",
-        f"FileType={file_type}",
-        f"Currentdate={now}",
+    database_fields: list[Tuple[str, str]] = [
+        ("DocumentNo", document_no),
+        ("DocumentRev", rev),
+        ("SheetNumber", sheet),
+        ("Description", ""),
+        ("ActualSize", size_from_letter(m.group(1))),
+        ("PumpModel", "(UNKNOWN)"),
+        ("OEM", "Flowserve"),
+        ("PumpSize", ""),
+        ("OrderNumber", ""),
+        ("SerialNumber", ""),
+        ("Document_Type", loc['doctype']),
+        ("DrawingClass", "COMMERCIAL"),
+        ("DesignCenter", "Desio, Italy"),
+        ("OEMSite", "Desio, Italy"),
+        ("OEMDrawingNumber", ""),
+        ("UOM", uom_from_letter(m.group(6))),
+        ("DWGLanguage", loc['lang']),
+        ("CurrentRevision", "Y"),
+        ("EnteredBy", "10150286"),
+        ("Notes", ""),
+        ("NonEnglishDesc", ""),
+        ("SupersededBy", ""),
+        ("NumberOfStages", ""),
     ]
+    drawing_info: list[Tuple[str, str]] = [
+        ("DocumentNo", document_no),
+        ("SheetNumber", sheet),
+        ("Document_Type", "Detail" if loc["doctype"] == "DETAIL" else "Customer Drawings"),
+        ("DocumentRev", rev),
+        ("FileName", file_name),
+        ("FileType", file_type),
+        ("Currentdate", now),
+    ]
+    return build_edi(database_fields=database_fields, drawing_info=drawing_info)
 
 
 def build_edi_iss(*, match: re.Match, file_name: str) -> List[str]:
@@ -174,39 +188,37 @@ def build_edi_iss(*, match: re.Match, file_name: str) -> List[str]:
     rev = match.group(4)
     sheet = match.group(5)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return [
-        "[Database]",
-        "ServerName=ORMDB33",
-        "ProjectName=FPD Engineering",
-        "[DatabaseFields]",
-        f"DocumentNo={document_no}",
-        f"DocumentRev={rev}",
-        f"SheetNumber={sheet}",
-        "Description=",
-        "PumpModel=(UNKNOWN)",
-        "OEM=Flowserve",
-        "PumpSize=",
-        "OrderNumber=",
-        "SerialNumber=",
-        "Document_Type=Customer Drawings",
-        "DrawingClass=COMMERCIAL",
-        "DesignCenter=Desio, Italy",
-        "OEMSite=Desio, Italy",
-        "OEMDrawingNumber=",
-        "UOM=Metric",
-        "DWGLanguage=English",
-        "CurrentRevision=Y",
-        "EnteredBy=10150286",
-        "Notes=",
-        "NonEnglishDesc=",
-        "SupersededBy=",
-        "NumberOfStages=",
-        "[DrawingInfo]",
-        f"DocumentNo={document_no}",
-        f"SheetNumber={sheet}",
-        "Document_Type=Customer Drawings",
-        f"DocumentRev={rev}",
-        f"FileName={file_name}",
-        "FileType=Pdf",
-        f"Currentdate={now}",
+    database_fields: list[Tuple[str, str]] = [
+        ("DocumentNo", document_no),
+        ("DocumentRev", rev),
+        ("SheetNumber", sheet),
+        ("Description", ""),
+        ("PumpModel", "(UNKNOWN)"),
+        ("OEM", "Flowserve"),
+        ("PumpSize", ""),
+        ("OrderNumber", ""),
+        ("SerialNumber", ""),
+        ("Document_Type", "Customer Drawings"),
+        ("DrawingClass", "COMMERCIAL"),
+        ("DesignCenter", "Desio, Italy"),
+        ("OEMSite", "Desio, Italy"),
+        ("OEMDrawingNumber", ""),
+        ("UOM", "Metric"),
+        ("DWGLanguage", "English"),
+        ("CurrentRevision", "Y"),
+        ("EnteredBy", "10150286"),
+        ("Notes", ""),
+        ("NonEnglishDesc", ""),
+        ("SupersededBy", ""),
+        ("NumberOfStages", ""),
     ]
+    drawing_info: list[Tuple[str, str]] = [
+        ("DocumentNo", document_no),
+        ("SheetNumber", sheet),
+        ("Document_Type", "Customer Drawings"),
+        ("DocumentRev", rev),
+        ("FileName", file_name),
+        ("FileType", "Pdf"),
+        ("Currentdate", now),
+    ]
+    return build_edi(database_fields=database_fields, drawing_info=drawing_info)
