@@ -110,27 +110,3 @@ Azione sul nuovo file:
 8. **Log GUI:** immediato — **Log file:** scritto **alla fine** con `ProcessTime` ultima riga  
 
 ---
-
-## 📊 Diagramma (Mermaid)
-
-```mermaid
-flowchart TD
-  A[Nuovo file D…RxxSyy{UOM}] --> B{Controlli formali OK?}
-  B -- No --> X[ERROR_DIR]:::err
-  B -- Sì --> C[Seleziona archivio con stesso Prefix+Syy]
-  C --> D{Esistono file per Syy?}
-  D -- No --> E[ARCHIVIA nuovo file]:::ok
-  D -- Sì --> F[Valuta revisioni per la STESSA METRICA]
-  F --> G{Rnew < max_rev?}
-  G -- Sì --> X[ERROR_DIR: Rev Precedente]:::err
-  G -- No --> H{Rnew = max_rev?}
-  H -- Sì --> I{Regole alla stessa R}
-  I -- PR --> PR[PARI_REV_DIR]:::pr
-  I -- OK --> E2[ARCHIVIA]:::ok
-  H -- No --> J[Storicizza rev < Rnew della stessa metrica]:::stor
-  J --> E2[ARCHIVIA]:::ok
-
-  classDef ok fill:#DCFCE7,stroke:#16A34A,color:#064E3B
-  classDef pr fill:#FEF9C3,stroke:#CA8A04,color:#713F12
-  classDef err fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D
-  classDef stor fill:#E0E7FF,stroke:#4F46E5,color:#1E3A8A
