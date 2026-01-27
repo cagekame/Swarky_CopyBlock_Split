@@ -742,7 +742,7 @@ class TabellariDialog(tk.Toplevel):
         prefix_entry = ttk.Entry(frm, textvariable=self.prefix_var, width=32)
         prefix_entry.grid(row=1, column=0, sticky="ew", pady=(4, 12))
 
-        ttk.Label(frm, text="Numero di posizioni (1-99):").grid(row=2, column=0, sticky="w")
+        ttk.Label(frm, text="Numero di posizioni (>=1):").grid(row=2, column=0, sticky="w")
         count_entry = ttk.Entry(frm, textvariable=self.count_var, width=8)
         count_entry.grid(row=3, column=0, sticky="w", pady=(4, 12))
 
@@ -802,11 +802,12 @@ class TabellariDialog(tk.Toplevel):
             return
 
         n = int(n_str)
-        if n <= 0 or n > 99:
-            messagebox.showerror("Tabellari", "Il numero deve essere tra 1 e 99.")
+        if n <= 0:
+            messagebox.showerror("Tabellari", "Il numero deve essere maggiore di zero")
             return
 
-        items = [f"{prefix}{i:02d}" for i in range(1, n + 1)]
+        width = max(2, len(str(n)))
+        items = [f"{prefix}{i:0{width}d}" for i in range(1, n + 1)]
         line = ",".join(items) + "\n"
 
         try:
