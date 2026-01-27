@@ -3,12 +3,12 @@
 from __future__ import annotations
 import logging
 import time
-from pathlib import Path
 
 from swarky_core import (
     Config,
     BASE_NAME,
     ISS_BASENAME,
+    ISS_BASENAME_2,
     map_location,
     log_swarky,
     log_error,
@@ -24,14 +24,17 @@ from swarky_core import (
 def iss_loading(cfg: Config) -> bool:
     """
     Elabora i PDF nella cartella ISS:
-      - valida il nome (ISS_BASENAME);
+      - accetta 3 formati:
+          1) ISS_BASENAME (G....ISSRxxSxx.pdf)
+          2) ISS_BASENAME_2 (....RxxSxx.pdf) -> nuovo formato
+          3) BASE_NAME (D.. ..RxxSxx?.pdf)   -> pdf standard ma EDI stile ISS
       - sposta in PLM;
-      - genera DESEDI;
+      - genera DESEDI (stile ISS);
       - aggiorna SwarkyISS.log;
       - log_swarky()/log_error() verso la GUI.
-    Ritorna True se ha fatto almeno qualcosa.
     """
     did = False
+
     try:
         candidates = [
             p for p in cfg.DIR_ISS.iterdir()
@@ -42,36 +45,78 @@ def iss_loading(cfg: Config) -> bool:
         return False
 
     for p in candidates:
-        m = ISS_BASENAME.fullmatch(p.name)
-        if not m:
+        m_iss1 = ISS_BASENAME.fullmatch(p.name)         # G....ISSRxxSxx.pdf
+        m_iss2 = ISS_BASENAME_2.fullmatch(p.name)       # ....RxxSxx.pdf (nuovo)
+        m_std  = None if (m_iss1 or m_iss2) else BASE_NAME.fullmatch(p.name)  # D.. ..pdf
+
+        if not (m_iss1 or m_iss2 or m_std):
             log_error(cfg, p.name, "Nome ISS Errato")
             continue
+
+        if m_iss1:
+            kind = "ISS_CLASSIC"
+        elif m_iss2:
+            kind = "ISS_MARK"
+        else:
+            kind = "ISS_STD"
 
         try:
             with ui_phase(f"{p.name} • ISS_To_PLM"):
                 move_to(p, cfg.PLM_DIR)
 
             with ui_phase(f"{p.name} • ISS_Write_EDI"):
-                write_edi(cfg, file_name=p.name, out_dir=cfg.PLM_DIR, iss_match=m)
+                if m_iss1:
+                    # formato G....ISSRxxSxx
+                    write_edi(
+                        file_name=p.name,
+                        out_dir=cfg.PLM_DIR,
+                        iss_match=m_iss1,
+                    )
 
-            log_swarky(cfg, p.name, "ISS", "ISS", "", "")
+                elif m_iss2:
+                    # formato nuovo: YYYYJOB...-...R00S01.pdf
+                    docno = m_iss2.group("docno")
+                    rev = m_iss2.group("rev")
+                    sheet = m_iss2.group("sheet")
+
+                    order_number = docno.split("-", 1)[0]
+
+                    write_edi(
+                        file_name=p.name,
+                        out_dir=cfg.PLM_DIR,
+                        iss_style=True,
+                        document_no_override=docno,
+                        order_number=order_number,
+                        rev_override=rev,
+                        sheet_override=sheet,
+                    )
+
+                else:
+                    # BASE_NAME ma deve usare EDI stile ISS (campi diversi)
+                    assert m_std is not None
+                    write_edi(
+                        file_name=p.name,
+                        out_dir=cfg.PLM_DIR,
+                        iss_style=True,
+                        m=m_std,
+                    )
+
+            log_swarky(cfg, p.name, "ISS", kind, "", "")
             did = True
 
         except Exception as e:
             logging.exception("Impossibile processare ISS %s: %s", p.name, e)
 
-        # Aggiornamento SwarkyISS.log (best effort)
-        try:
-            now = time.localtime()
-            stem = p.stem
-            log_path = cfg.DIR_ISS / "SwarkyISS.log"
-            line = time.strftime("%d.%b.%Y # %H:%M:%S", now) + f" # {stem}"
-            write_lines(log_path, [line])
-        except Exception:
-            logging.exception("ISS: impossibile aggiornare SwarkyISS.log")
+        finally:
+            try:
+                now = time.localtime()
+                log_path = cfg.DIR_ISS / "SwarkyISS.log"
+                line = time.strftime("%d.%b.%Y # %H:%M:%S", now) + f" # {p.stem}"
+                write_lines(log_path, [line])
+            except Exception:
+                logging.exception("ISS: impossibile aggiornare SwarkyISS.log")
 
     return did
-
 
 # ---- FIV ----------------------------------------------------------------------
 
@@ -109,7 +154,7 @@ def fiv_loading(cfg: Config) -> bool:
                 loc = map_location(m, cfg)
 
             with ui_phase(f"{p.name} • FIV_Write_EDI"):
-                write_edi(cfg, m=m, file_name=p.name, loc=loc, out_dir=cfg.PLM_DIR)
+                write_edi(m=m, file_name=p.name, loc=loc, out_dir=cfg.PLM_DIR)
 
             with ui_phase(f"{p.name} • FIV_To_PLM"):
                 move_to(p, cfg.PLM_DIR)
