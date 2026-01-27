@@ -1,3 +1,6 @@
+27/07/2026
+Aggiunti nuovi basename per ISS
+
 # Swarky — Regole di Archiviazione
 
 La logica di archiviazione opera **per sheet**: tutte le decisioni (validazioni, confronto revisioni, coesistenza delle metriche, storicizzazione) avvengono **all’interno dello stesso foglio `Syy`** per un determinato *document number* (Prefix).
