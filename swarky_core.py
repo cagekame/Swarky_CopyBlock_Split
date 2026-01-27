@@ -62,6 +62,7 @@ class Config:
 
 BASE_NAME = re.compile(r"D(\w)(\w)(\d{6})R(\d{2})S(\d{2})(\w)\.(tif|pdf)$", re.IGNORECASE)
 ISS_BASENAME = re.compile(r"G(\d{4})([A-Za-z0-9]{4})([A-Za-z0-9]{6})ISSR(\d{2})S(\d{2})\.pdf$", re.IGNORECASE)
+ISS_BASENAME_2 = re.compile(r"^(?P<docno>.+?)R(?P<rev>\d{2})S(?P<sheet>\d{2})\.(?P<ext>pdf)$", re.IGNORECASE)
 
 def _docno_from_match(m: re.Match) -> str:
     return f"D{m.group(1)}{m.group(2)}{m.group(3)}"
@@ -354,6 +355,7 @@ def _edi_body(
     lang: str,
     file_name: str,
     file_type: str,
+    order_number: str = "",
     now: Optional[str] = None
 ) -> List[str]:
     now = now or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -370,7 +372,7 @@ def _edi_body(
         "PumpModel=(UNKNOWN)",
         "OEM=Flowserve",
         "PumpSize=",
-        "OrderNumber=",
+        f"OrderNumber={order_number}",
         "SerialNumber=",
         f"Document_Type={doctype}",
         "DrawingClass=COMMERCIAL",
@@ -397,14 +399,19 @@ def _edi_body(
     return header
 
 def write_edi(
-    cfg: Config,
     file_name: str,
     out_dir: Path,
     *,
     m: Optional[re.Match] = None,
     iss_match: Optional[re.Match] = None,
-    loc: Optional[dict] = None
+    loc: Optional[dict] = None,
+    iss_style: bool = False,
+    document_no_override: Optional[str] = None,
+    order_number: Optional[str] = None,
+    rev_override: Optional[str] = None,
+    sheet_override: Optional[str] = None,
 ) -> None:
+
     edi = out_dir / (Path(file_name).stem + ".DESEDI")
     if edi.exists():
         return
@@ -417,9 +424,43 @@ def write_edi(
             description=" Impeller Specification Sheet",
             actual_size="A4", uom="Metric", doctype="DETAIL", lang="English",
             file_name=file_name, file_type="Pdf",
+            order_number=(order_number or ""),
         )
-        write_lines(out_dir / (Path(file_name).stem + ".DESEDI"), body)
+        write_lines(edi, body)
         return
+    if iss_style:
+        if m is None and (document_no_override is None or rev_override is None or sheet_override is None):
+            raise ValueError("write_edi: iss_style richiede 'm' oppure tutti gli override (document_no, rev, sheet)")
+
+        if document_no_override is not None:
+            document_no = document_no_override
+            rev = rev_override or ""
+            sheet = sheet_override or ""
+        else:
+            assert m is not None
+            document_no = f"D{m.group(1)}{m.group(2)}{m.group(3)}"
+            rev = rev_override or m.group(4)
+            sheet = sheet_override or m.group(5)
+
+        ext = Path(file_name).suffix.lower()
+        file_type = "Pdf" if ext == ".pdf" else "Tiff"
+
+        body = _edi_body(
+            document_no=document_no,
+            rev=rev,
+            sheet=sheet,
+            description=" Impeller Specification Sheet",
+            actual_size="A4",
+            uom="Metric",
+            doctype="DETAIL",
+            lang="English",
+            file_name=file_name,
+            file_type=file_type,
+            order_number=(order_number or ""),
+        )
+        write_lines(edi, body)
+        return
+        
     if m is None or loc is None:
         raise ValueError("write_edi: per STANDARD/FIV servono 'm' (BASE_NAME) e 'loc' (map_location)")
     document_no = f"D{m.group(1)}{m.group(2)}{m.group(3)}"
